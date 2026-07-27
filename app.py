@@ -264,7 +264,6 @@ def load_data(path: str):
     distributors["Region"] = distributors["Country"].map(COUNTRY_TO_REGION).fillna("Other")
     kol = _clean_kol_sheet(kol_raw)
 
-    # Sheet6: assumptions block (rows 1-9) + country beds table (header row 12)
     raw6 = pd.read_excel(path, sheet_name="Sheet6", header=None)
     assumptions = {
         "bed_ratio": float(raw6.iloc[1, 1]),
@@ -424,8 +423,13 @@ with tab2:
 
     section_open("Competitor Benchmark Matrix")
     st.dataframe(competitive_df, use_container_width=True, height=340)
+    
+    # Fix for Pandas / Plotly version compatibility
+    price_counts = competitive_df[price_col].value_counts().reset_index()
+    price_counts.columns = ["Positioning", "Count"]
+
     fig_c = px.bar(
-        competitive_df[price_col].value_counts().reset_index(name="Count").rename(columns={"index": "Positioning"}),
+        price_counts,
         x="Positioning", y="Count", template=PLOTLY_TEMPLATE,
     )
     fig_c.update_traces(marker_color=GOLD, marker_line_width=0)
@@ -620,75 +624,56 @@ with tab5:
     sea_total = PROD_QA_DAYS + TRANSIT_DAYS["Sea Freight"] + customs
     acceleration = round(sea_total / air_total, 1)
 
-    fig_cc = go.Figure()
-    fig_cc.add_trace(go.Bar(y=["Sea Freight"], x=[sea_total], orientation="h", marker_color=RED, name="Sea"))
-    fig_cc.add_trace(go.Bar(y=["Air Freight"], x=[air_total], orientation="h", marker_color=GREEN, name="Air"))
-    fig_cc.update_layout(template=PLOTLY_TEMPLATE, height=200, showlegend=False, xaxis_title="Total Cash Conversion Days", margin=dict(l=10, r=10, t=10, b=30))
-    st.plotly_chart(fig_cc, use_container_width=True, config={"displayModeBar": False})
-    st.markdown(kpi_card(f"Cash Conversion Acceleration — {dest_country}", f"{acceleration}x faster via Air Freight", "gold"), unsafe_allow_html=True)
+    lead_time_df = pd.DataFrame([
+        {"Mode": "Air Freight", "Days": air_total},
+        {"Mode": "Sea Freight", "Days": sea_total}
+    ])
+    fig_lead = px.bar(
+        lead_time_df, x="Days", y="Mode", orientation="h",
+        text="Days", template=PLOTLY_TEMPLATE
+    )
+    fig_lead.update_traces(marker_color=[TEAL, GOLD], textposition="outside")
+    fig_lead.update_layout(height=220, showlegend=False, xaxis_title="Total Days to Delivery", yaxis_title="")
+    st.plotly_chart(fig_lead, use_container_width=True, config={"displayModeBar": False})
+    
+    st.info(f"⚡ **Air Freight** accelerates your delivery pipeline by **{acceleration}x** compared to Sea Freight for {dest_country}.")
     section_close()
 
 # ==========================================================================
 # TAB 6 — DYNAMIC PRICING & MARGIN LAYER
 # ==========================================================================
 with tab6:
-    section_open("Order Cost Basis")
-    b1, b2, b3 = st.columns(3)
-    with b1:
-        order_value = st.number_input("Order Value (USD)", value=42000, step=1000)
-    with b2:
-        base_cogs_pct = st.slider("Baseline COGS (% of Order Value)", 40, 85, 62)
-    with b3:
-        polymer_share = st.slider("Polyurethane/Pebax Share of COGS (%)", 10, 60, 35)
-    section_close()
+    section_open("Raw Material Price Sensitivity & COGS Simulator")
+    m_col1, m_col2 = st.columns(2)
+    with m_col1:
+        pu_change = st.slider("Polyurethane Cost Variance (%)", -20.0, 50.0, 0.0, 5.0)
+    with m_col2:
+        nitinol_change = st.slider("Nitinol Wire Cost Variance (%)", -20.0, 50.0, 0.0, 5.0)
 
-    section_open("Raw Material Price Sensitivity")
-    s1, s2 = st.columns(2)
-    with s1:
-        polyurethane_change = st.slider("Polyurethane Cost Change (%)", -30, 60, 0)
-    with s2:
-        nitinol_change = st.slider("Nitinol Wire Cost Change (%)", -30, 60, 0)
-    section_close()
+    base_cogs = 25.0  # Base cost per unit in USD
+    base_price = 65.0 # Base selling price in USD
 
-    base_cogs = order_value * (base_cogs_pct / 100)
-    nitinol_share = 100 - polymer_share
-    polymer_cost = base_cogs * (polymer_share / 100)
-    nitinol_cost = base_cogs * (nitinol_share / 100)
+    # Simple cost impact model
+    pu_weight = 0.6
+    nitinol_weight = 0.4
+    adjusted_cogs = base_cogs * (1 + (pu_change/100 * pu_weight) + (nitinol_change/100 * nitinol_weight))
+    margin_usd = base_price - adjusted_cogs
+    margin_pct = (margin_usd / base_price) * 100
 
-    adjusted_cogs = (
-        polymer_cost * (1 + polyurethane_change / 100)
-        + nitinol_cost * (1 + nitinol_change / 100)
-    )
-    gross_margin_usd = order_value - adjusted_cogs
-    gross_margin_pct = (gross_margin_usd / order_value) * 100 if order_value else 0
-
-    section_open("Live COGS &amp; Gross Margin")
-    m1, m2, m3 = st.columns(3)
-    with m1:
-        st.markdown(kpi_card("Adjusted COGS", f"${adjusted_cogs:,.0f}"), unsafe_allow_html=True)
-    with m2:
-        st.markdown(kpi_card("Gross Margin (USD)", f"${gross_margin_usd:,.0f}", "gold"), unsafe_allow_html=True)
-    with m3:
-        st.markdown(kpi_card("Gross Margin (%)", f"{gross_margin_pct:,.1f}%", "gold"), unsafe_allow_html=True)
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown(kpi_card("Adjusted COGS / Unit", f"${adjusted_cogs:.2f}"), unsafe_allow_html=True)
+    with c2:
+        st.markdown(kpi_card("Gross Margin / Unit", f"${margin_usd:.2f}", "gold"), unsafe_allow_html=True)
+    with c3:
+        st.markdown(kpi_card("Gross Margin %", f"{margin_pct:.1f}%", "green" if margin_pct >= 30 else ("gold" if margin_pct >= 20 else "red")), unsafe_allow_html=True)
 
     st.write("")
-    if gross_margin_pct > 30:
-        st.markdown('<div class="badge-green">🟢 APPROVED ORDER — Margin Above Threshold</div>', unsafe_allow_html=True)
-    elif gross_margin_pct >= 20:
-        st.markdown('<div class="badge-yellow">🟡 MARGIN SQUEEZED — Requires Management Approval</div>', unsafe_allow_html=True)
+    if margin_pct >= 30:
+        st.markdown('<div class="badge-green">🟢 Approved Order — Standard Profitability</div>', unsafe_allow_html=True)
+    elif margin_pct >= 20:
+        st.markdown('<div class="badge-yellow">🟡 Margin Squeezed — Requires Regional VP Approval</div>', unsafe_allow_html=True)
     else:
-        st.markdown('<div class="badge-red">🔴 ORDER LOCKED — Repricing Required</div>', unsafe_allow_html=True)
+        st.markdown('<div class="badge-red">🔴 Order Locked — Repricing Required Immediately</div>', unsafe_allow_html=True)
 
-    st.caption(
-        "Cost-basis percentages are illustrative defaults for sensitivity analysis. Replace with "
-        "actual bill-of-materials and standard costing data before using this for pricing approval."
-    )
     section_close()
-
-st.write("")
-st.markdown(
-    f'<div style="text-align:center; color:{MUTED}; font-size:0.72rem; padding: 10px 0 30px 0;">'
-    "AMECATH Executive Intelligence Platform &middot; Internal Use Only"
-    "</div>",
-    unsafe_allow_html=True,
-)
