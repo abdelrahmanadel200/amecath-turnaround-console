@@ -424,10 +424,14 @@ with tab2:
 
     section_open("Competitor Benchmark Matrix")
     st.dataframe(competitive_df, use_container_width=True, height=340)
-    fig_c = px.bar(
-        competitive_df[price_col].value_counts().reset_index(name="Count").rename(columns={"index": "Positioning"}),
-        x="Positioning", y="Count", template=PLOTLY_TEMPLATE,
-    )
+    price_counts = competitive_df[price_col].value_counts().reset_index()
+price_counts.columns = ["Positioning", "Count"]
+fig_c = px.bar(
+    price_counts,
+    x="Positioning", 
+    y="Count", 
+    template=PLOTLY_TEMPLATE,
+)
     fig_c.update_traces(marker_color=GOLD, marker_line_width=0)
     fig_c.update_layout(height=280, showlegend=False, xaxis_title="", yaxis_title="")
     st.plotly_chart(fig_c, use_container_width=True, config={"displayModeBar": False})
