@@ -182,6 +182,32 @@ def empty_state(message: str = "No records match the current filter selection.")
     )
 
 
+def _clean_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Strip whitespace from column names so lookups like df['Region'] never fail
+    on a stray 'Region ' or leading space introduced by copy/paste or Excel export."""
+    df = df.copy()
+    df.columns = [str(c).strip() for c in df.columns]
+    return df
+
+
+def safe_filter(df: pd.DataFrame, col: str, selected_values) -> pd.DataFrame:
+    """Filter df by col only if col actually exists in df. If it doesn't, return
+    df unfiltered rather than raising a KeyError — missing dimensions are treated
+    as 'no filter applied' rather than a crash."""
+    if col not in df.columns:
+        return df
+    if not selected_values:
+        return df.iloc[0:0]  # nothing selected -> empty result, not an error
+    return df[df[col].isin(selected_values)]
+
+
+def safe_unique(df: pd.DataFrame, col: str) -> list:
+    """Sorted unique values for a column, or an empty list if the column is missing."""
+    if col not in df.columns:
+        return []
+    return sorted(df[col].dropna().unique().tolist())
+
+
 # ==========================================================================
 # CONSTANTS
 # ==========================================================================
@@ -317,6 +343,22 @@ def _mock_dataset():
     )
     forecast[REVENUE_COL] = forecast["Serviceable Sessions (Yr1 Units, per formula)"] * forecast["Blended Unit Price (USD)"]
     forecast[ADJ_REVENUE_COL] = forecast[REVENUE_COL] * (assumptions["cath_per_100_sessions"] / 100)
+
+    # Apply the same cleanup used on the real workbook, so the mock path can
+    # never drift out of sync with the live-data schema:
+    hospitals = _clean_columns(hospitals)
+    distributors = _clean_columns(distributors)
+    kol = _clean_columns(kol)
+    competitive = _clean_columns(competitive)
+    regulatory = _clean_columns(regulatory)
+    forecast = _clean_columns(forecast)
+
+    # distributors_df needs a Region column for the sidebar filter to work on
+    # this fallback path too — derive it the same way the real loader does,
+    # rather than hardcoding it, so the two paths can't drift apart again.
+    if "Region" not in distributors.columns and "Country" in distributors.columns:
+        distributors["Region"] = distributors["Country"].map(COUNTRY_TO_REGION).fillna("Other")
+
     return hospitals, distributors, kol, competitive, regulatory, forecast, assumptions
 
 
@@ -328,13 +370,15 @@ def load_workbook(path: str):
     competitive = pd.read_excel(path, sheet_name="Sheet4")
     regulatory = pd.read_excel(path, sheet_name="Sheet5")
 
-    hospitals.columns = [str(c).strip() for c in hospitals.columns]
-    distributors.columns = [str(c).strip() for c in distributors.columns]
-    competitive.columns = [str(c).strip() for c in competitive.columns]
-    regulatory.columns = [str(c).strip() for c in regulatory.columns]
+    hospitals = _clean_columns(hospitals)
+    distributors = _clean_columns(distributors)
+    kol_raw = _clean_columns(kol_raw)
+    competitive = _clean_columns(competitive)
+    regulatory = _clean_columns(regulatory)
 
     hospitals["Bed Count (Est.)"] = hospitals["Estimated Bed Count"].apply(_extract_bed_count)
-    distributors["Region"] = distributors["Country"].map(COUNTRY_TO_REGION).fillna("Other")
+    if "Country" in distributors.columns:
+        distributors["Region"] = distributors["Country"].map(COUNTRY_TO_REGION).fillna("Other")
     kol = _clean_kol_sheet(kol_raw)
 
     # Sheet6: assumptions block (rows 2-8) + per-country detail table (header row 12)
@@ -390,15 +434,19 @@ st.sidebar.markdown(f"**Data Source:** {data_source}")
 st.sidebar.markdown("---")
 
 st.sidebar.markdown("**🌍 Region**")
-all_regions = sorted(hospitals_df["Region"].dropna().unique().tolist())
+all_regions = safe_unique(hospitals_df, "Region")
 selected_regions = st.sidebar.multiselect("Region", options=all_regions, default=all_regions, label_visibility="collapsed")
 
 st.sidebar.markdown("**📍 Country**")
-country_pool = sorted(hospitals_df.loc[hospitals_df["Region"].isin(selected_regions), "Country"].dropna().unique().tolist())
+if "Region" in hospitals_df.columns and "Country" in hospitals_df.columns:
+    country_pool = sorted(hospitals_df.loc[hospitals_df["Region"].isin(selected_regions), "Country"].dropna().unique().tolist())
+else:
+    country_pool = safe_unique(hospitals_df, "Country")
 selected_countries = st.sidebar.multiselect("Country", options=country_pool, default=country_pool, label_visibility="collapsed")
 
 st.sidebar.markdown("**🏛️ Sector**")
-all_sectors = sorted(hospitals_df["Sector (Gov/Private/Military)"].dropna().unique().tolist())
+SECTOR_COL = "Sector (Gov/Private/Military)" if "Sector (Gov/Private/Military)" in hospitals_df.columns else "Sector"
+all_sectors = safe_unique(hospitals_df, SECTOR_COL)
 selected_sectors = st.sidebar.multiselect("Sector", options=all_sectors, default=all_sectors, label_visibility="collapsed")
 
 st.sidebar.markdown("---")
@@ -412,19 +460,22 @@ st.sidebar.caption(
 )
 st.sidebar.caption("Tabs 7-9 (SAP Tracking, Predictive ETA, Dynamic Pricing) are Data Simulation Mode tools, independent of the filters above.")
 
-# Apply filters
-hosp_f = hospitals_df[
-    hospitals_df["Region"].isin(selected_regions)
-    & hospitals_df["Country"].isin(selected_countries)
-    & hospitals_df["Sector (Gov/Private/Military)"].isin(selected_sectors)
-]
-dist_f = distributors_df[
-    distributors_df["Region"].isin(selected_regions) & distributors_df["Country"].isin(selected_countries)
-]
-if "Region" in forecast_df.columns:
-    fore_f = forecast_df[forecast_df["Region"].isin(selected_regions) & forecast_df["Country"].isin(selected_countries)]
-else:
-    fore_f = forecast_df
+# Apply filters — safe_filter no-ops (returns the frame unfiltered) if a
+# dimension column doesn't exist on a given dataframe, instead of raising
+# a KeyError. This is what fixes the crash: distributors_df is filtered by
+# "Region" and "Country" only if those columns are actually present.
+hosp_f = hospitals_df
+hosp_f = safe_filter(hosp_f, "Region", selected_regions)
+hosp_f = safe_filter(hosp_f, "Country", selected_countries)
+hosp_f = safe_filter(hosp_f, SECTOR_COL, selected_sectors)
+
+dist_f = distributors_df
+dist_f = safe_filter(dist_f, "Region", selected_regions)
+dist_f = safe_filter(dist_f, "Country", selected_countries)
+
+fore_f = forecast_df
+fore_f = safe_filter(fore_f, "Region", selected_regions)
+fore_f = safe_filter(fore_f, "Country", selected_countries)
 
 # ==========================================================================
 # HEADER
@@ -496,12 +547,15 @@ with tab1:
             section_close()
         with col_b:
             section_open("Sector Breakdown", "Gov / Private / Military mix")
-            sector_mix = hosp_f["Sector (Gov/Private/Military)"].value_counts().reset_index()
-            sector_mix.columns = ["Sector", "Count"]
-            fig2 = px.pie(sector_mix, names="Sector", values="Count", hole=0.62, template=PLOTLY_TEMPLATE)
-            fig2.update_traces(textinfo="percent+label", marker_line_color=NAVY, marker_line_width=2)
-            fig2.update_layout(height=340, showlegend=False)
-            st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
+            if SECTOR_COL in hosp_f.columns:
+                sector_mix = hosp_f[SECTOR_COL].value_counts().reset_index()
+                sector_mix.columns = ["Sector", "Count"]
+                fig2 = px.pie(sector_mix, names="Sector", values="Count", hole=0.62, template=PLOTLY_TEMPLATE)
+                fig2.update_traces(textinfo="percent+label", marker_line_color=NAVY, marker_line_width=2)
+                fig2.update_layout(height=340, showlegend=False)
+                st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
+            else:
+                st.caption("Sector data not available in the current dataset.")
             section_close()
 
         section_open("Bed Capacity by Country", "Estimated total beds, aggregated by country")
