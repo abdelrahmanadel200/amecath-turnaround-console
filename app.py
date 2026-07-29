@@ -1,207 +1,182 @@
 import pandas as pd
-from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-output_path = 'MEA_Master_Intelligence_Workbook.xlsx'
+# 1. إنشاء الـ Workbook وتحديد الشيتات
+wb = openpyxl.Workbook()
+wb.remove(wb.active)  # حذف الشيت الافتراضي
 
-countries = [
-    {'Region':'GCC','Country':'Saudi Arabia','Tier':'Tier 1 Major','HD_Patients':31900,'PD_Patients':3200,'Beds':5528,'RegAuthority':'SFDA / NUPCO','AccessMonths':'6-9','Population':36839707},
-    {'Region':'GCC','Country':'UAE','Tier':'Tier 1 Major','HD_Patients':7060,'PD_Patients':850,'Beds':2884,'RegAuthority':'MoHAP / DHA / DOH','AccessMonths':'3-6','Population':9516871},
-    {'Region':'GCC','Country':'Qatar','Tier':'Tier 1 Major','HD_Patients':941,'PD_Patients':110,'Beds':1191,'RegAuthority':'MoPH','AccessMonths':'3-5','Population':2712499},
-    {'Region':'GCC','Country':'Kuwait','Tier':'Tier 1 Major','HD_Patients':4312,'PD_Patients':180,'Beds':1673,'RegAuthority':'Ministry of Health','AccessMonths':'4-6','Population':4962358},
-    {'Region':'GCC','Country':'Oman','Tier':'Tier 1 Major','HD_Patients':4650,'PD_Patients':220,'Beds':1500,'RegAuthority':'MoH Oman','AccessMonths':'4-6','Population':4649855},
-    {'Region':'GCC','Country':'Bahrain','Tier':'Tier 1 Major','HD_Patients':739,'PD_Patients':95,'Beds':600,'RegAuthority':'NHRA / MOH','AccessMonths':'4-6','Population':1477469},
-    {'Region':'East Africa','Country':'Kenya','Tier':'Tier 2 Regional','HD_Patients':11020,'PD_Patients':0,'Beds':2567,'RegAuthority':'PPB','AccessMonths':'3-4','Population':55100586},
-    {'Region':'West Africa','Country':'Nigeria','Tier':'Tier 2 Regional','HD_Patients':22380,'PD_Patients':0,'Beds':1706,'RegAuthority':'NAFDAC','AccessMonths':'6-9','Population':223804632},
-    {'Region':'West Africa','Country':'Ghana','Tier':'Tier 2 Regional','HD_Patients':5174,'PD_Patients':0,'Beds':2550,'RegAuthority':'FDA Ghana','AccessMonths':'6-9','Population':34494307},
-    {'Region':'East Africa','Country':'Tanzania','Tier':'Tier 2 Regional','HD_Patients':8093,'PD_Patients':0,'Beds':1820,'RegAuthority':'TMDA','AccessMonths':'4-6','Population':67438106},
-    {'Region':'Southern Africa','Country':'South Africa','Tier':'Tier 1 Major','HD_Patients':8881,'PD_Patients':0,'Beds':2500,'RegAuthority':'SAHPRA','AccessMonths':'6-12','Population':60414495},
-    {'Region':'East Africa','Country':'Sudan','Tier':'Tier 1 Major','HD_Patients':7259,'PD_Patients':0,'Beds':1400,'RegAuthority':'NMPB / MoH','AccessMonths':'6-12','Population':48396555},
-    {'Region':'North Africa','Country':'Morocco','Tier':'Tier 1 Major','HD_Patients':22443,'PD_Patients':0,'Beds':2200,'RegAuthority':'AMMPS / MoH','AccessMonths':'6-12','Population':37404874},
+# ألوان التنسيق الاحترافي
+header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid") # كحلي داكن
+header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+data_font = Font(name="Calibri", size=10)
+bold_font = Font(name="Calibri", size=10, bold=True)
+center_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+left_align = Alignment(horizontal="left", vertical="center", wrap_text=True)
+right_align = Alignment(horizontal="right", vertical="center")
+
+thin_border = Border(
+    left=Side(style='thin', color='D9D9D9'),
+    right=Side(style='thin', color='D9D9D9'),
+    top=Side(style='thin', color='D9D9D9'),
+    bottom=Side(style='thin', color='D9D9D9')
+)
+
+# ----------------------------------------------------
+# Sheet 1: Target Hospitals & Dialysis Centers
+# ----------------------------------------------------
+ws1 = wb.create_sheet(title="Hospitals_And_Centers")
+headers1 = [
+    "Region", "Country", "Facility Name", "Sector", 
+    "Estimated Bed Count", "Dialysis Capabilities", 
+    "Target AMECATH Portfolio", "Account Tier"
+]
+ws1.append(headers1)
+
+hospitals_data = [
+    ["GCC", "Saudi Arabia", "King Faisal Specialist Hospital & Research Centre", "Government", 1200, "HD / PD / Transplant", "HD Acute & Permcath / PD Catheters", "Tier 1 Major"],
+    ["GCC", "Saudi Arabia", "King Salman Center for Kidney Diseases", "Government", 78, "HD Dedicated", "HD Acute & Permcath", "Tier 1 Major"],
+    ["GCC", "Saudi Arabia", "King Fahad Medical City", "Government", 1300, "HD / PD / ICU", "HD Acute & Permcath / PD Catheters", "Tier 1 Major"],
+    ["GCC", "UAE", "Sheikh Shakhbout Medical City (SSMC)", "Government", 741, "HD / PD / ICU", "HD Acute & Permcath / PD Catheters", "Tier 1 Major"],
+    ["GCC", "UAE", "Cleveland Clinic Abu Dhabi", "Private/Gov", 364, "HD / PD / Transplant", "HD Acute & Permcath / PD Catheters", "Tier 1 Major"],
+    ["GCC", "Qatar", "Hamad General Hospital - Nephrology Dept", "Government", 600, "HD / PD", "HD Acute & Permcath / PD Catheters", "Tier 1 Major"],
+    ["GCC", "Kuwait", "Amiri Hospital - Dialysis Center", "Government", 400, "HD / PD", "HD Acute & Permcath / PD Catheters", "Tier 1 Major"],
+    ["GCC", "Oman", "Royal Hospital Muscat - Nephrology", "Government", 630, "HD / PD", "HD Acute & Permcath / PD Catheters", "Tier 1 Major"],
+    ["GCC", "Bahrain", "Salmaniya Medical Complex", "Government", 1200, "HD / PD", "HD Acute & Permcath / PD Catheters", "Tier 1 Major"],
+    ["Southern Africa", "South Africa", "Groote Schuur Hospital - Renal Unit", "Government", 975, "HD / PD / Transplant", "HD Acute & Permcath", "Tier 1 Major"],
+    ["Southern Africa", "South Africa", "Netcare Jakaranda Hospital - Dialysis", "Private", 200, "HD Dedicated", "HD Acute & Permcath", "Tier 2 Regional"],
+    ["East Africa", "Kenya", "Kenyatta National Hospital - Renal Unit", "Government", 1800, "HD / Acute Care", "HD Acute & Permcath", "Tier 1 Major"],
+    ["West Africa", "Nigeria", "Lagos University Teaching Hospital (LUTH)", "Government", 760, "HD Dedicated", "HD Acute & Permcath", "Tier 1 Major"],
+    ["West Africa", "Ghana", "Korle Bu Teaching Hospital - Dialysis", "Government", 2000, "HD Dedicated", "HD Acute & Permcath", "Tier 1 Major"],
+    ["East Africa", "Tanzania", "Muhimbili National Hospital", "Government", 1500, "HD Dedicated", "HD Acute & Permcath", "Tier 1 Major"],
+    ["East Africa", "Sudan", "Ibn Sina Hospital - Kidney Care ( Khartoum/Red Sea )", "Government", 300, "HD Dedicated", "HD Acute & Permcath", "Tier 1 Major"],
+    ["North Africa", "Morocco", "CHU Ibn Rochd Casablanca - Nephrologie", "Government", 1000, "HD / PD", "HD Acute & Permcath", "Tier 1 Major"]
 ]
 
-hospitals = [
-    ['GCC','Saudi Arabia','King Faisal Specialist Hospital & Research Centre','Specialized Renal Center',1200,'HD','Both','Tier 1 Major'],
-    ['GCC','Saudi Arabia','King Salman Center for Kidney Diseases','Specialized Renal Center',78,'HD','Both','Tier 1 Major'],
-    ['GCC','Saudi Arabia','King Fahad Medical City','Government',1300,'HD','Both','Tier 1 Major'],
-    ['GCC','UAE','Cleveland Clinic Abu Dhabi','Private',360,'HD','Both','Tier 1 Major'],
-    ['GCC','UAE','Sheikh Khalifa Medical City','Government',600,'HD','Both','Tier 1 Major'],
-    ['GCC','Qatar','Hamad General Hospital','Government',611,'HD','Both','Tier 1 Major'],
-    ['GCC','Kuwait','Mubarak Al-Kabeer Hospital','Government',623,'HD','Both','Tier 1 Major'],
-    ['GCC','Oman','The Royal Hospital','Government',694,'HD','Both','Tier 1 Major'],
-    ['GCC','Bahrain','Salmaniya Medical Complex','Government',1100,'HD','Both','Tier 1 Major'],
-    ['East Africa','Kenya','Kenyatta National Hospital','Government',1800,'HD','HD','Tier 1 Major'],
-    ['West Africa','Nigeria','Lagos University Teaching Hospital','Government',761,'HD','HD','Tier 1 Major'],
-    ['West Africa','Ghana','Korle Bu Teaching Hospital','Government',2000,'HD','HD','Tier 1 Major'],
-    ['East Africa','Tanzania','Muhimbili National Hospital','Government',1500,'HD','HD','Tier 1 Major'],
-    ['Southern Africa','South Africa','Chris Hani Baragwanath Academic Hospital','Government',3200,'HD','HD','Tier 1 Major'],
-    ['East Africa','Sudan','Ahmed Gasim Kidney Center','Specialized Renal Center',0,'HD','HD','Tier 1 Major'],
-    ['North Africa','Morocco','Ibn Sina University Hospital','Government',1090,'HD','HD','Tier 1 Major'],
+for row in hospitals_data:
+    ws1.append(row)
+
+# ----------------------------------------------------
+# Sheet 2: Distributors Pipeline
+# ----------------------------------------------------
+ws2 = wb.create_sheet(title="Distributors_Pipeline")
+headers2 = [
+    "Country", "Distributor Name", "Specialty Focus", 
+    "Market Coverage", "Tendering Capability", "Pipeline Status"
 ]
-
-# Add placeholder coverage for other country-specific facilities
-for c in ['UAE','Qatar','Kuwait','Oman','Bahrain','Kenya','Nigeria','Ghana','Tanzania','South Africa','Sudan','Morocco']:
-    if c not in ['Saudi Arabia']:
-        hospitals.append([
-            next(x['Region'] for x in countries if x['Country']==c),
-            c,
-            'To Be Verified Renal Facility',
-            'Under Evaluation',
-            0,
-            'HD',
-            'To Be Verified',
-            'Under Evaluation'
-        ])
-
-# Deduplicate and keep a manageable template size
-seen = set()
-clean_hospitals = []
-for row in hospitals:
-    key = tuple(row[:3])
-    if key in seen:
-        continue
-    seen.add(key)
-    clean_hospitals.append(row)
-
-hospitals = clean_hospitals
-
-distributors = [
-    ['Saudi Arabia','Tamer Group','Dialysis / ICU','National','Yes','Target Partner'],
-    ['Saudi Arabia','Attieh Medico','ICU / Urology / Dialysis','National','Yes','Target Partner'],
-    ['UAE','Zahrawi Group','Dialysis / ICU','Regional','Yes','Target Partner'],
-    ['UAE','GulfDrug','Dialysis Equipment / Consumables','National','Yes','Target Partner'],
-    ['Kuwait','Yiaco Medical','Medical Devices / Dialysis','National','Yes','Target Partner'],
-    ['Qatar','Al Muftah Co Healthcare Division','General Medical Equipment','National','Yes','Prospect'],
-    ['Kenya','Crown Healthcare','General Medical Equipment','Regional','Yes','Target Partner'],
-    ['Nigeria','JNC International Limited','ICU / Imaging / Turnkey','Regional','Yes','Target Partner'],
-    ['Ghana','Ibermansa Ghana','Equipment Planning / Procurement','National','Yes','Target Partner'],
-    ['Tanzania','Africa Healthcare Network','Dialysis Services / Consumables','Regional','Yes','Target Partner'],
-    ['South Africa','To Be Verified','Dialysis / Renal','National','Under Evaluation','Under Evaluation'],
-    ['Sudan','To Be Verified','Dialysis / Renal','National','Under Evaluation','Under Evaluation'],
-    ['Morocco','To Be Verified','Dialysis / Renal','National','Under Evaluation','Under Evaluation'],
-    ['Oman','To Be Verified','Dialysis / Renal','National','Under Evaluation','Under Evaluation'],
-    ['Bahrain','To Be Verified','Dialysis / Renal','National','Under Evaluation','Under Evaluation'],
-]
-
-kols = [
-    ['Nephrology / Dialysis Unit','Head of Nephrology / Dialysis Medical Director','HD vascular access longevity, infection rates, catheter dwell time','Clinical evidence for lower infection and improved patency','Acute HD / Permcath'],
-    ['Interventional Nephrology','Interventional Nephrologist','First-pass insertion success, access preservation','Reliable insertion performance and bedside usability','Acute HD / Permcath'],
-    ['Procurement / Supply Chain','Procurement Officer / Value Analysis Chair','Budget control and tender compliance','Competitive pricing with compliant documentation','Acute HD / Permcath / PD'],
-    ['Peritoneal Dialysis Program','Nephrology Program Lead','PD catheter migration, leaks, exit-site infection','PD-focused access solutions for home program expansion','PD Catheters'],
-]
-
-regulatory = [
-    ['Saudi Arabia','SFDA / NUPCO','MDMA via GHAD portal; local authorized rep required','CE / ISO 13485 + SFDA technical file','6-9'],
-    ['UAE','MoHAP / DHA / DOH','Medical device registration via federal/emirate pathways','CE / ISO 13485','3-6'],
-    ['Qatar','MoPH','Local distributor submission; FSC required','CE / ISO 13485','3-5'],
-    ['Kuwait','Ministry of Health','Local agent registration; FSC required','CE / ISO 13485','4-6'],
-    ['Oman','MoH Oman','Local agent/distributor registration','CE / ISO 13485','4-6'],
-    ['Bahrain','NHRA / MOH','Local distributor registration','CE / ISO 13485','4-6'],
-    ['Kenya','PPB','Authorized representative / registered distributor','CE / ISO 13485','3-4'],
-    ['Nigeria','NAFDAC','Local representative + NAFDAC registration','CE / ISO 13485','6-9'],
-    ['Ghana','FDA Ghana','Local registration and import clearance','CE / ISO 13485','6-9'],
-    ['Tanzania','TMDA','Device registration and importer listing','CE / ISO 13485','4-6'],
-    ['South Africa','SAHPRA','Risk-based registration; local rep required','CE / ISO 13485','6-12'],
-    ['Sudan','NMPB / MoH','Local registration pathway','CE / ISO 13485','6-12'],
-    ['Morocco','AMMPS / MoH','Local registration pathway','CE / ISO 13485','6-12'],
-]
-
-blended_price_hd = 85
-blended_price_pd = 120
-hd_ratio_of_beds = 0.04
-sessions_per_week = 3
-hd_catheters_per_100_sessions = 2
-pd_catheters_per_patient_year = 2
-gcc_pd_penetration = 0.12
-
-def is_gcc(region):
-    return region == 'GCC'
-
-# Build financial model
-fm_rows = []
-for c in countries:
-    active_pd = c['PD_Patients'] if is_gcc(c['Region']) else 0
-    annual_hd_units = round(c['HD_Patients'] * hd_catheters_per_100_sessions / 100.0, 2)
-    annual_pd_units = round(active_pd * pd_catheters_per_patient_year, 2) if is_gcc(c['Region']) else 0
-    revenue = round(annual_hd_units * blended_price_hd + annual_pd_units * blended_price_pd, 2)
-    fm_rows.append([
-        c['Region'], c['Country'], c['Tier'], c['HD_Patients'], active_pd,
-        annual_hd_units, annual_pd_units, f'{blended_price_hd}/{blended_price_pd}', revenue
-    ])
-
-wb = Workbook()
-ws = wb.active
-ws.title = 'Sheet 1_Target Hospitals'
-
-headers1 = ['Region','Country','Facility Name','Sector','Estimated Bed Count','Nephrology & Dialysis Capabilities (HD / PD)','Target AMECATH Dialysis Portfolio (HD / PD / Both)','Account Tier']
-ws.append(headers1)
-for row in hospitals:
-    ws.append(row)
-
-ws2 = wb.create_sheet('Sheet 2_Distributors')
-headers2 = ['Country','Distributor Name','Specialty Focus','Market Coverage','Tendering Capability','Potential Pipeline Status']
 ws2.append(headers2)
-for row in distributors:
+
+distributors_data = [
+    ["Saudi Arabia", "Attieh Medico", "Dialysis & ICU Consumables", "National", "Yes", "Target Partner"],
+    ["Saudi Arabia", "Al-Ewan Medical Company", "Nephrology & Urology", "National", "Yes", "Target Partner"],
+    ["UAE", "Zahrawi Group", "Dialysis, Vascular & ICU", "Regional (GCC)", "Yes", "Target Partner"],
+    ["Qatar", "Intercol / Local Partner", "Medical Devices", "National", "Yes", "Prospect"],
+    ["Kuwait", "Bader Sultan & Bros", "Medical Equipment & Renal", "National", "Yes", "Target Partner"],
+    ["Oman", "Muscat Pharmacy - Medical Div", "Pharma & Devices", "National", "Yes", "Prospect"],
+    ["Bahrain", "Y.K. Almoayyed Medical", "Hospital Consumables", "National", "Yes", "Prospect"],
+    ["South Africa", "Adcock Ingram / Local Partner", "Renal & Hospital Care", "National", "Yes", "Target Partner"],
+    ["Kenya", "Harleys Pharma / Medical", "Hospital Supplies", "National", "Yes", "Target Partner"],
+    ["Nigeria", "Drugfield / Local Partner", "Medical Consumables", "National", "Yes", "Prospect"],
+    ["Ghana", "Tobbinco Medical", "Hospital Consumables", "National", "Yes", "Prospect"],
+    ["Tanzania", "Astra Pharma / Medical", "Medical Devices", "National", "Yes", "Prospect"],
+    ["Sudan", "To Be Verified (Post-Stability)", "Medical Supplies", "National", "Under Evaluation", "Under Evaluation"],
+    ["Morocco", "Promamec", "Medical Devices & Dialysis", "National", "Yes", "Target Partner"]
+]
+
+for row in distributors_data:
     ws2.append(row)
 
-ws3 = wb.create_sheet('Sheet 3_KOLs')
-headers3 = ['Department / Specialty','Key Decision Maker Title / Role','Clinical Pain Point / Priority','AMECATH Value Proposition','Target Product Focus']
+# ----------------------------------------------------
+# Sheet 3: Regulatory & Registration Timelines
+# ----------------------------------------------------
+ws3 = wb.create_sheet(title="Regulatory_Timelines")
+headers3 = [
+    "Country", "Target Authority", "Required Certificates", 
+    "Compliance Route", "Estimated Access Timeline (Months)"
+]
 ws3.append(headers3)
-for row in kols:
+
+regulatory_data = [
+    ["Saudi Arabia", "SFDA (Saudi Food & Drug Authority)", "MDMA Approval via GHAD portal", "CE Mark + ISO 13485 + SFDA", 8],
+    ["UAE", "MoHAP / DHA / DOH", "MoHAP Medical Device Registration", "CE Mark + ISO 13485", 4],
+    ["Qatar", "MoPH Qatar", "MoPH Device Registration", "CE Mark + FSC", 4],
+    ["Kuwait", "Ministry of Health (MoH)", "MoH Licensing", "CE Mark + ISO 13485", 6],
+    ["Oman", "MoH Oman", "MoH Device Registration", "CE Mark + ISO 13485", 5],
+    ["Bahrain", "NHRA Bahrain", "NHRA Listing", "CE Mark + ISO 13485", 4],
+    ["South Africa", "SAHPRA", "Medical Device Establishment License", "CE Mark + ISO 13485", 6],
+    ["Kenya", "Pharmacy & Poisons Board (PPB)", "PPB Device Import License", "CE Mark + ISO 13485", 5],
+    ["Nigeria", "NAFDAC", "NAFDAC Product Registration", "CE Mark + ISO 13485", 9],
+    ["Ghana", "FDA Ghana", "FDA Device Registration", "CE Mark + ISO 13485", 6],
+    ["Tanzania", "TMDA", "TMDA Listing", "CE Mark + ISO 13485", 6],
+    ["Sudan", "NMPB Sudan", "NMPB Special Import Permit", "CE Mark + ISO 13485", 12],
+    ["Morocco", "DMP / MoH Morocco", "DMP Registration Certificate", "CE Mark + ISO 13485", 7]
+]
+
+for row in regulatory_data:
     ws3.append(row)
 
-ws4 = wb.create_sheet('Sheet 4_Regulatory')
-headers4 = ['Country','Target Authority','Required Certificates / Registration Route','AMECATH Compliance Route (CE / ISO / SFDA)','Estimated Time-to-Market (Months)']
+# ----------------------------------------------------
+# Sheet 4: Financial & Patient Volume Assumptions
+# ----------------------------------------------------
+ws4 = wb.create_sheet(title="Financial_Model_Data")
+headers4 = [
+    "Region", "Country", "Strategic Tier", "Population", 
+    "Metric Basis", "Active HD Patients", "Active PD Patients (GCC)", 
+    "Est. Annual HD Catheter Units", "Est. Annual PD Catheter Units", 
+    "Blended Price USD", "Projected Revenue USD"
+]
 ws4.append(headers4)
-for row in regulatory:
+
+# بيانات المرضى وتوقعات المبيعات
+financial_data = [
+    ["GCC", "Saudi Arabia", "Tier 1", 36839707, "Treated ESRD", 31900, 2500, "=F2*2", "=G2*1.5", 85, "=(H2+I2)*J2"],
+    ["GCC", "UAE", "Tier 2", 9516871, "Treated ESRD", 7060, 600, "=F3*2", "=G3*1.5", 85, "=(H3+I3)*J3"],
+    ["GCC", "Qatar", "Tier 1", 2712499, "Treated ESRD", 941, 150, "=F4*2", "=G4*1.5", 85, "=(H4+I4)*J4"],
+    ["GCC", "Kuwait", "Tier 1", 4962358, "Treated ESRD", 4312, 350, "=F5*2", "=G5*1.5", 85, "=(H5+I5)*J5"],
+    ["GCC", "Oman", "Tier 1", 4649855, "Treated ESRD", 4650, 300, "=F6*2", "=G6*1.5", 85, "=(H6+I6)*J6"],
+    ["GCC", "Bahrain", "Tier 1", 1477469, "Treated ESRD", 739, 80, "=F7*2", "=G7*1.5", 85, "=(H7+I7)*J7"],
+    ["East Africa", "Kenya", "Tier 2", 55100586, "Treated ESRD", 11020, 0, "=F8*2", "=G8*1.5", 45, "=(H8+I8)*J8"],
+    ["West Africa", "Nigeria", "Tier 2", 223804632, "Treated ESRD", 22380, 0, "=F9*2", "=G9*1.5", 45, "=(H9+I9)*J9"],
+    ["West Africa", "Ghana", "Tier 2", 34494307, "Treated ESRD", 5174, 0, "=F10*2", "=G10*1.5", 45, "=(H10+I10)*J10"],
+    ["East Africa", "Tanzania", "Tier 2", 67438106, "Treated ESRD", 8093, 0, "=F11*2", "=G11*1.5", 45, "=(H11+I11)*J11"],
+    ["Southern Africa", "South Africa", "Tier 1", 60414495, "Treated ESRD", 72497, 0, "=F12*2", "=G12*1.5", 55, "=(H12+I12)*J12"],
+    ["East Africa", "Sudan", "Tier 1", 48396555, "Treated ESRD", 7259, 0, "=F13*2", "=G13*1.5", 45, "=(H13+I13)*J13"],
+    ["North Africa", "Morocco", "Tier 1", 37404874, "Treated ESRD", 22443, 0, "=F14*2", "=G14*1.5", 50, "=(H14+I14)*J14"]
+]
+
+for row in financial_data:
     ws4.append(row)
 
-ws5 = wb.create_sheet('Sheet 5_Financial Model')
-headers5 = ['Region','Country','Strategic Tier','Active Dialysis Patients (HD)','Active Dialysis Patients (PD - GCC Focused)','Estimated Annual HD Catheter Units Needed','Estimated Annual PD Catheter Units Needed','Blended Unit Price (USD)','Projected Annual Revenue Potential (USD)']
-ws5.append(headers5)
-for row in fm_rows:
-    ws5.append(row)
-
-ws6 = wb.create_sheet('References')
-refs = [
-    ['Source Type','Reference / Notes','URL / Identifier'],
-    ['Workbook baseline','AMECATH_Market_Intelligence-1.xlsx','Local file'],
-    ['ISN-GKHA','Middle East narrative script and regional kidney health context','https://www.theisn.org/wp-content/uploads/2024/01/ISN-GKHA-2023_Narrative_Script_Middle-East_v0.1.pdf'],
-    ['South Africa registry','South African Renal Registry annual reports 2022 and 2023','https://www.sahr.org.za/'],
-    ['Saudi Arabia regulation','SFDA import permits / medical device registration','https://www.sfda.gov.sa/'],
-    ['UAE regulation','MOHAP medical device and health facility regulation','https://mohap.gov.ae/'],
-    ['Qatar regulation','Ministry of Public Health medical device registration','https://www.moph.gov.qa/'],
-    ['Kuwait regulation','Ministry of Health device registration','https://www.moh.gov.kw/'],
-    ['Kenya regulation','Pharmacy and Poisons Board','https://www.pharmacyboardkenya.org/'],
-    ['Nigeria regulation','NAFDAC medical devices / import control','https://www.nafdac.gov.ng/'],
-    ['Ghana regulation','Food and Drugs Authority','https://fdaghana.gov.gh/'],
-    ['Tanzania regulation','Tanzania Medicines and Medical Devices Authority','https://www.tmda.go.tz/'],
-    ['South Africa regulation','SAHPRA medical device licensing','https://www.sahpra.org.za/'],
-]
-for row in refs:
-    ws6.append(row)
-
-# Formatting
-header_fill = PatternFill('solid', fgColor='1F4E78')
-header_font = Font(color='FFFFFF', bold=True)
-for wsx in wb.worksheets:
-    for cell in wsx[1]:
+# ----------------------------------------------------
+# Formatting & Styling Loop (تنسيق كل الشيتات)
+# ----------------------------------------------------
+for ws in wb.worksheets:
+    # تنسيق الهيدر
+    for col in range(1, ws.max_column + 1):
+        cell = ws.cell(row=1, column=col)
         cell.fill = header_fill
         cell.font = header_font
-        cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-    wsx.freeze_panes = 'A2'
-    for col in wsx.columns:
-        max_len = 0
-        col_letter = get_column_letter(col[0].column)
-        for cell in col:
-            try:
-                val = len(str(cell.value)) if cell.value is not None else 0
-                if val > max_len:
-                    max_len = val
-            except:
-                pass
-        wsx.column_dimensions[col_letter].width = min(max_len + 2, 45)
+        cell.alignment = center_align
+    
+    # تنسيق صفوف البيانات وتعديل العرض تلقائياً
+    for row in range(2, ws.max_row + 1):
+        for col in range(1, ws.max_column + 1):
+            cell = ws.cell(row=row, column=col)
+            cell.font = data_font
+            cell.border = thin_border
+            if isinstance(cell.value, (int, float)):
+                cell.alignment = right_align
+            else:
+                cell.alignment = left_align
 
-wb.save(output_path)
-print(output_path)
+    # ضبط عرض الأعمدة تلقائياً
+    for col in ws.columns:
+        max_len = max(len(str(cell.value or '')) for cell in col)
+        col_letter = get_column_letter(col[0].column)
+        ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
+
+# حفظ الملف النهائي
+file_name = "MEA_Master_Intelligence_Workbook.xlsx"
+wb.save(file_name)
+print(f"✅ Executed Successfully! File saved as: {file_name}")
